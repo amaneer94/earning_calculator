@@ -1,92 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save } from 'lucide-react';
 
-export default function SaveReportDialog({ open, onOpenChange, reportData }) {
+export default function SaveReportDialog({ open, onOpenChange, onSave, isUpdate = false }) {
   const [title, setTitle] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && !isUpdate) {
+      // Generate default title for new reports
+      const today = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      setTitle(`Earnings Report - ${today}`);
+    }
+  }, [open, isUpdate]);
 
   const handleSave = async () => {
     if (!title.trim()) return;
-
-    setSaving(true);
+    
+    setLoading(true);
     try {
-      const response = await fetch('/api/reports', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          reportDate: reportData.reportDate,
-          globalTaxRate: reportData.globalTaxRate,
-          defaultPayoneerFee: reportData.defaultPayoneerFee,
-          sources: reportData.sources,
-          results: reportData.results
-        }),
-      });
-
-      if (response.ok) {
-        setTitle('');
-        onOpenChange(false);
-        // Refresh the page or update the sidebar
-        window.location.reload();
-      } else {
-        console.error('Failed to save report');
-      }
-    } catch (error) {
-      console.error('Error saving report:', error);
+      await onSave(title.trim());
+      setTitle('');
     } finally {
-      setSaving(false);
+      setLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !loading) {
+      handleSave();
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Save Report</DialogTitle>
-          <DialogDescription>
-            Enter a title for your earnings report to save it for future reference.
-          </DialogDescription>
+          <DialogTitle>
+            {isUpdate ? 'Update Report' : 'Save Report'}
+          </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="title" className="text-right">
-              Title
-            </Label>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="reportTitle">Report Title</Label>
             <Input
-              id="title"
+              id="reportTitle"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="col-span-3"
-              placeholder="e.g., November 2024 Earnings"
+              onKeyPress={handleKeyPress}
+              placeholder="Enter report title..."
+              disabled={loading}
+              autoFocus
             />
           </div>
         </div>
+        
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             Cancel
           </Button>
-          <Button 
-            type="button" 
+          <Button
             onClick={handleSave}
-            disabled={!title.trim() || saving}
+            disabled={!title.trim() || loading}
           >
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Saving...' : 'Save Report'}
+            {loading ? 'Saving...' : (isUpdate ? 'Update' : 'Save')}
           </Button>
         </DialogFooter>
       </DialogContent>

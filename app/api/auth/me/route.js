@@ -1,23 +1,14 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getSessionUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const cookieStore = cookies();
-    const sessionToken = cookieStore.get('session')?.value;
-
-    if (!sessionToken) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
-    }
-
-    const user = await getSessionUser(sessionToken);
+    const token = request.cookies.get('auth-token')?.value;
+    const user = await getSessionUser(token);
+    
     if (!user) {
       return NextResponse.json(
-        { error: 'Invalid session' },
+        { error: 'Not authenticated' },
         { status: 401 }
       );
     }

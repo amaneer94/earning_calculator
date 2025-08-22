@@ -1,23 +1,38 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, FileText, LogOut, Calendar, Calculator, ChevronLeft, ChevronRight, Trash2, Edit } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { 
+  Calculator, 
+  FileText, 
+  Plus, 
+  LogOut, 
+  ChevronLeft, 
+  ChevronRight,
+  Trash2,
+  Calendar
+} from 'lucide-react';
 
-export default function Sidebar({ user, onReportSelect, selectedReportId, isCollapsed, onToggleCollapse }) {
+export default function Sidebar({ 
+  user, 
+  collapsed, 
+  onToggle, 
+  onLogout,
+  currentReportId,
+  onLoadReport,
+  onDeleteReport,
+  onNewReport 
+}) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState(null);
-  const router = useRouter();
 
   useEffect(() => {
-    fetchReports();
+    loadReports();
   }, []);
 
-  const fetchReports = async () => {
+  const loadReports = async () => {
     try {
       const response = await fetch('/api/reports');
       if (response.ok) {
@@ -25,58 +40,9 @@ export default function Sidebar({ user, onReportSelect, selectedReportId, isColl
         setReports(data.reports);
       }
     } catch (error) {
-      console.error('Error fetching reports:', error);
+      console.error('Failed to load reports:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  const handleDeleteReport = async (reportId, e) => {
-    e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this report?')) return;
-    
-    setDeletingId(reportId);
-    try {
-      const response = await fetch(`/api/reports/${reportId}`, {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        setReports(reports.filter(r => r.id !== reportId));
-        if (selectedReportId === reportId) {
-          onReportSelect(null);
-        }
-      } else {
-        alert('Failed to delete report');
-      }
-    } catch (error) {
-      console.error('Error deleting report:', error);
-      alert('Error deleting report');
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const handleReportClick = async (report) => {
-    try {
-      const response = await fetch(`/api/reports/${report.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        onReportSelect(data.report);
-      } else {
-        console.error('Failed to load report');
-      }
-    } catch (error) {
-      console.error('Error loading report:', error);
     }
   };
 
@@ -88,135 +54,153 @@ export default function Sidebar({ user, onReportSelect, selectedReportId, isColl
     });
   };
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'PKR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const handleDeleteClick = (e, reportId) => {
+    e.stopPropagation();
+    onDeleteReport(reportId);
+    loadReports();
+  };
+
   return (
-    <div className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-16' : 'w-80'} bg-white shadow-lg border-r lg:block transition-all duration-300`}>
-      <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className="p-6 border-b">
-          <div className="flex items-center gap-3 mb-4">
-            <Calculator className="h-8 w-8 text-primary" />
-            <div>
-              <h2 className="text-lg font-semibold">Calculator</h2>
-              {!isCollapsed && <p className="text-sm text-muted-foreground">Welcome, {user.username}</p>}
+    <div className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${
+      collapsed ? 'w-16' : 'w-80'
+    } fixed h-full z-10`}>
+      {/* Header */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          {!collapsed && (
+            <div className="flex items-center space-x-2">
+              <Calculator className="h-6 w-6 text-blue-600" />
+              <h1 className="text-lg font-semibold text-gray-900">
+                Earnings Calculator
+              </h1>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onToggleCollapse}
-              className="ml-auto p-1 h-8 w-8"
-            >
-              {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </Button>
-          </div>
-          {!isCollapsed && (
-            <Button 
-              className="w-full"
-              onClick={() => onReportSelect(null)}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              New Report
-            </Button>
           )}
-          {isCollapsed && (
-            <Button size="sm" className="w-full p-2" onClick={() => onReportSelect(null)}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-
-        {/* Reports List */}
-        <div className={`flex-1 ${isCollapsed ? 'p-2' : 'p-6'}`}>
-          {!isCollapsed && <h3 className="text-sm font-medium text-muted-foreground mb-4">Saved Reports</h3>}
-          <ScrollArea className="h-full">
-            {loading ? (
-              <div className="space-y-3">
-                {!isCollapsed ? (
-                  [...Array(5)].map((_, i) => (
-                    <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
-                  ))
-                ) : (
-                  [...Array(3)].map((_, i) => (
-                    <div key={i} className="h-12 bg-gray-100 rounded-lg animate-pulse mb-2" />
-                  ))
-                )}
-              </div>
-            ) : reports.length === 0 ? (
-              !isCollapsed ? (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">No reports yet</p>
-                  <p className="text-sm text-muted-foreground">Create your first report to get started</p>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <FileText className="h-8 w-8 text-muted-foreground mx-auto" />
-                </div>
-              )
-            ) : (
-              <div className="space-y-3">
-                {reports.map((report) => (
-                  <Card
-                    key={report.id} 
-                    className={`cursor-pointer hover:shadow-md transition-all ${
-                      selectedReportId === report.id ? 'ring-2 ring-primary bg-primary/5' : ''
-                    }`}
-                    onClick={() => handleReportClick(report)}
-                  >
-                    <CardContent className={isCollapsed ? "p-2" : "p-4"}>
-                      {isCollapsed ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <FileText className="h-4 w-4 text-primary" />
-                          <span className="text-xs text-center truncate w-full" title={report.title}>
-                            {report.title.substring(0, 8)}...
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-start gap-3">
-                          <FileText className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-medium truncate">{report.title}</h4>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs text-muted-foreground">
-                                {formatDate(report.report_date)}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Created {formatDate(report.created_at)}
-                            </p>
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                              onClick={(e) => handleDeleteReport(report.id, e)}
-                              disabled={deletingId === report.id}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </div>
-
-        {/* Footer */}
-        <div className={`${isCollapsed ? 'p-2' : 'p-6'} border-t`}>
-          <Button 
-            variant="outline" 
-            className={isCollapsed ? "w-full p-2" : "w-full"}
-            onClick={handleLogout}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggle}
+            className="p-2"
           >
-            <LogOut className={isCollapsed ? "h-4 w-4" : "mr-2 h-4 w-4"} />
-            {!isCollapsed && "Logout"}
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
           </Button>
         </div>
+        
+        {!collapsed && (
+          <div className="mt-2 text-sm text-gray-600">
+            Welcome, {user.username}
+          </div>
+        )}
+      </div>
+
+      {/* New Report Button */}
+      <div className="p-4">
+        <Button
+          onClick={onNewReport}
+          className="w-full bg-blue-600 hover:bg-blue-700"
+          size={collapsed ? "sm" : "default"}
+        >
+          <Plus className="h-4 w-4" />
+          {!collapsed && <span className="ml-2">New Report</span>}
+          
+        </Button>
+      </div>
+
+      {/* Reports List */}
+      <div className="flex-1 overflow-hidden">
+        {!collapsed && (
+          <div className="px-4 pb-2">
+            <h2 className="text-sm font-medium text-gray-900">Saved Reports</h2>
+          </div>
+        )}
+        
+        <ScrollArea className="flex-1 px-2">
+          {loading ? (
+            <div className="p-4 text-center text-gray-500">
+              {collapsed ? '...' : 'Loading reports...'}
+            </div>
+          ) : reports.length === 0 ? (
+            !collapsed && (
+              <div className="p-4 text-center text-gray-500">
+                No reports yet. Create your first report!
+              </div>
+            )
+          ) : (
+            <div className="space-y-1">
+              {reports.map((report) => (
+                <div
+                  key={report.id}
+                  className={`group relative rounded-lg border transition-colors cursor-pointer ${
+                    currentReportId === report.id
+                      ? 'bg-blue-50 border-blue-200'
+                      : 'bg-white border-gray-200 hover:bg-gray-50'
+                  }`}
+                  onClick={() => onLoadReport(report.id)}
+                >
+                  {collapsed ? (
+                    <div className="p-3 flex justify-center">
+                      <FileText className="h-4 w-4 text-gray-600" />
+                    </div>
+                  ) : (
+                    <div className="p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-gray-900 truncate">
+                            {report.title}
+                          </h3>
+                          <div className="flex items-center mt-1 text-xs text-gray-500">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {formatDate(report.report_date)}
+                          </div>
+                          <div className="mt-2 text-xs text-gray-600">
+                            <div>Total: {formatCurrency(report.grand_total_receivable)}</div>
+                            <div className="text-gray-400">
+                              Updated: {formatDate(report.updated_at)}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={(e) => handleDeleteClick(e, report.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-gray-200">
+        <Button
+          variant="ghost"
+          onClick={onLogout}
+          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+          size={collapsed ? "sm" : "default"}
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span className="ml-2">Logout</span>}
+          
+        </Button>
       </div>
     </div>
   );

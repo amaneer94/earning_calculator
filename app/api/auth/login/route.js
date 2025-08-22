@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifyPassword, createSession } from '@/lib/auth';
+import { authenticateUser, createSession } from '@/lib/auth';
 
 export async function POST(request) {
   try {
@@ -13,7 +12,8 @@ export async function POST(request) {
       );
     }
 
-    const user = await verifyPassword(username, password);
+    const user = await authenticateUser(username, password);
+    
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
@@ -21,20 +21,22 @@ export async function POST(request) {
       );
     }
 
-    const sessionToken = await createSession(user.id);
+    const token = await createSession(user.id);
     
-    const cookieStore = cookies();
-    cookieStore.set('session', sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
-    });
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: { id: user.id, username: user.username }
     });
+
+    // Set HTTP-only cookie
+    response.cookies.set('auth-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 // 7 days
+    });
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(

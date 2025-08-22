@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { deleteSession } from '@/lib/auth';
 
-export async function POST() {
+export async function POST(request) {
   try {
-    const cookieStore = cookies();
-    const sessionToken = cookieStore.get('session')?.value;
-
-    if (sessionToken) {
-      await deleteSession(sessionToken);
+    const token = request.cookies.get('auth-token')?.value;
+    
+    if (token) {
+      await deleteSession(token);
     }
 
-    cookieStore.delete('session');
+    const response = NextResponse.json({ success: true });
+    
+    // Clear the cookie
+    response.cookies.set('auth-token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0
+    });
 
-    return NextResponse.json({ success: true });
+    return response;
   } catch (error) {
     console.error('Logout error:', error);
     return NextResponse.json(
